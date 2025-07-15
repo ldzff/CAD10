@@ -3888,22 +3888,7 @@ namespace RobTeach.Views
                     passIndex++; // For user display or if pass index is needed in file, though not specified
 
                     // 2.a. Number of Primitives in Pass
-                    int totalPrimitives = 0;
-                    foreach (var trajectory in pass.Trajectories)
-                    {
-                        if (trajectory.PrimitiveType == "Polygon")
-                        {
-                            totalPrimitives += trajectory.Points.Count - 1;
-                            if (trajectory.OriginalDxfEntity is DxfLwPolyline polyline && polyline.IsClosed && trajectory.Points.Count > 2)
-                            {
-                                totalPrimitives++;
-                            }
-                        }
-                        else
-                        {
-                            totalPrimitives++;
-                        }
-                    }
+                    int totalPrimitives = pass.Trajectories.Sum(t => t.PrimitiveType == "Polygon" ? (t.Points.Count - ((t.OriginalDxfEntity as DxfLwPolyline)?.IsClosed ?? false ? 0 : 1)) : 1);
                     writer.WriteLine(((float)totalPrimitives).ToString("F3"));
 
                     int primitiveIndexInPass = 0;
@@ -3914,15 +3899,14 @@ namespace RobTeach.Views
                             primitiveIndexInPass++;
                             // 2.b.i. Primitive Index
                             writer.WriteLine(((float)primitiveIndexInPass).ToString("F3"));
-                        }
 
-                        // 2.b.ii. Primitive Type
-                        float primitiveType = 0.0f;
-                        if (trajectory.PrimitiveType == "Line") primitiveType = 1.0f;
-                        else if (trajectory.PrimitiveType == "Circle") primitiveType = 2.0f;
-                        else if (trajectory.PrimitiveType == "Arc") primitiveType = 3.0f;
-                        else if (trajectory.PrimitiveType == "Polygon") primitiveType = 1.0f; // Treat as a series of lines
-                        writer.WriteLine(primitiveType.ToString("F3"));
+                            // 2.b.ii. Primitive Type
+                            float primitiveType = 0.0f;
+                            if (trajectory.PrimitiveType == "Line") primitiveType = 1.0f;
+                            else if (trajectory.PrimitiveType == "Circle") primitiveType = 2.0f;
+                            else if (trajectory.PrimitiveType == "Arc") primitiveType = 3.0f;
+                            writer.WriteLine(primitiveType.ToString("F3"));
+                        }
 
                         // 2.b.iii. Upper Nozzle Gas
                         writer.WriteLine((trajectory.UpperNozzleGasOn ? 11.0f : 10.0f).ToString("F3"));
@@ -4007,6 +3991,9 @@ namespace RobTeach.Views
                     // Handle polygons separately
                     foreach (var trajectory in pass.Trajectories.Where(t => t.PrimitiveType == "Polygon"))
                     {
+                        double totalLength = CalculateTrajectoryLength(trajectory);
+                        float speed = (float)(totalLength / trajectory.Runtime);
+
                         for (int i = 0; i < trajectory.Points.Count - 1; i++)
                         {
                             primitiveIndexInPass++;
@@ -4016,13 +4003,10 @@ namespace RobTeach.Views
                             writer.WriteLine((trajectory.UpperNozzleLiquidOn ? 12.0f : 10.0f).ToString("F3"));
                             writer.WriteLine((trajectory.LowerNozzleGasOn ? 21.0f : 20.0f).ToString("F3"));
                             writer.WriteLine((trajectory.LowerNozzleLiquidOn ? 22.0f : 10.0f).ToString("F3"));
+                            writer.WriteLine(speed.ToString("F3"));
 
                             Point3D p1 = trajectory.Points[i];
                             Point3D p2 = trajectory.Points[i + 1];
-                            double segmentLength = Math.Sqrt(Math.Pow(p2.X - p1.X, 2) + Math.Pow(p2.Y - p1.Y, 2) + Math.Pow(p2.Z - p1.Z, 2)) / 1000.0;
-                            float speedForSegment = (float)(segmentLength / trajectory.Runtime * (trajectory.Points.Count - 1));
-                            writer.WriteLine(speedForSegment.ToString("F3"));
-
                             WritePointData(writer, new DxfPoint(p1.X, p1.Y, p1.Z));
                             WritePointData(writer, new DxfPoint(p2.X, p2.Y, p2.Z));
 
@@ -4040,13 +4024,10 @@ namespace RobTeach.Views
                             writer.WriteLine((trajectory.UpperNozzleLiquidOn ? 12.0f : 10.0f).ToString("F3"));
                             writer.WriteLine((trajectory.LowerNozzleGasOn ? 21.0f : 20.0f).ToString("F3"));
                             writer.WriteLine((trajectory.LowerNozzleLiquidOn ? 22.0f : 10.0f).ToString("F3"));
+                            writer.WriteLine(speed.ToString("F3"));
 
                             Point3D p1 = trajectory.Points[trajectory.Points.Count - 1];
                             Point3D p2 = trajectory.Points[0];
-                            double segmentLength = Math.Sqrt(Math.Pow(p2.X - p1.X, 2) + Math.Pow(p2.Y - p1.Y, 2) + Math.Pow(p2.Z - p1.Z, 2)) / 1000.0;
-                            float speedForSegment = (float)(segmentLength / trajectory.Runtime * (trajectory.Points.Count));
-                            writer.WriteLine(speedForSegment.ToString("F3"));
-
                             WritePointData(writer, new DxfPoint(p1.X, p1.Y, p1.Z));
                             WritePointData(writer, new DxfPoint(p2.X, p2.Y, p2.Z));
 
