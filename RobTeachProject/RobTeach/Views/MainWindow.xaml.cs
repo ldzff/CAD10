@@ -892,14 +892,14 @@ namespace RobTeach.Views
         {
             if (trajectory == null) return;
 
-            trajectory.Points.Clear();
-
             switch (trajectory.PrimitiveType)
             {
                 case "Line":
+                    trajectory.Points.Clear();
                     trajectory.Points.AddRange(_cadService.ConvertLineTrajectoryToPoints(trajectory));
                     break;
                 case "Arc":
+                    trajectory.Points.Clear();
                     if (trajectory.ArcPoint1 != null && trajectory.ArcPoint2 != null && trajectory.ArcPoint3 != null)
                     {
                         var arcParams = GeometryUtils.CalculateArcParametersFromThreePoints(
@@ -1008,6 +1008,7 @@ namespace RobTeach.Views
                     }
                     break;
                 case "Circle":
+                    trajectory.Points.Clear();
                     // Debug.WriteLine($"[JULES_DEBUG] PopulateTrajectoryPoints (Circle): Input P1={trajectory.CirclePoint1.Coordinates}, P2={trajectory.CirclePoint2.Coordinates}, P3={trajectory.CirclePoint3.Coordinates}");
                     var circleParams = GeometryUtils.CalculateCircleCenterRadiusFromThreePoints(
                         trajectory.CirclePoint1.Coordinates,
@@ -1076,6 +1077,7 @@ namespace RobTeach.Views
                 case "Polygon":
                     if (trajectory.OriginalDxfEntity is DxfLwPolyline polyline)
                     {
+                        trajectory.Points.Clear();
                         var vertices = polyline.Vertices.Select(v => new System.Windows.Point(v.X, v.Y)).ToList();
                         int startIndex = FindBottomLeftVertexIndex(vertices);
                         var orderedVertices = new List<System.Windows.Point>();
