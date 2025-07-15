@@ -1819,7 +1819,6 @@ namespace RobTeach.Views
             Trajectory trajectoryToSelect = null; // Declare at wider scope
 
             // Detailed check for the main condition
-            Trajectory trajectoryToSelect = null;
             if (sender is System.Windows.Shapes.Shape clickedShape && _wpfShapeToDxfEntityMap.TryGetValue(clickedShape, out DxfEntity? dxfEntity))
             {
                 // keyExists is implicitly true if TryGetValue succeeds.
