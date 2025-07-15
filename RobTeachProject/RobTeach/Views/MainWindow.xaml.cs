@@ -2354,12 +2354,6 @@ namespace RobTeach.Views
                     }
                     // else, no valid selection or list is empty, ListBox default behavior (no selection or first item)
 
-                    // Reconcile DxfEntity instances if DXF was loaded from embedded content
-                    if (!string.IsNullOrEmpty(_currentConfiguration.DxfFileContent) && _currentDxfDocument != null)
-                    {
-                        ReconcileTrajectoryEntities(_currentConfiguration, _currentDxfDocument);
-                    }
-
                     // Populate points for all trajectories in the loaded configuration
                     if (_currentConfiguration != null && _currentConfiguration.SprayPasses != null)
                     {
@@ -2405,6 +2399,12 @@ namespace RobTeach.Views
                                 }
                             }
                         }
+                    }
+
+                    // Reconcile DxfEntity instances if DXF was loaded from embedded content
+                    if (!string.IsNullOrEmpty(_currentConfiguration.DxfFileContent) && _currentDxfDocument != null)
+                    {
+                        ReconcileTrajectoryEntities(_currentConfiguration, _currentDxfDocument);
                     }
 
                     UpdateSelectedTrajectoryDetailUI(); // Renamed: Update nozzle UI for potentially selected trajectory
