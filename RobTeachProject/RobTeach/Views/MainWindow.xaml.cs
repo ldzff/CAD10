@@ -3903,6 +3903,7 @@ namespace RobTeach.Views
                         if (trajectory.PrimitiveType == "Line") primitiveType = 1.0f;
                         else if (trajectory.PrimitiveType == "Circle") primitiveType = 2.0f;
                         else if (trajectory.PrimitiveType == "Arc") primitiveType = 3.0f;
+                        else if (trajectory.PrimitiveType == "Polygon") primitiveType = 1.0f; // Treat as a series of lines
                         writer.WriteLine(primitiveType.ToString("F3"));
 
                         // 2.b.iii. Upper Nozzle Gas
@@ -3965,6 +3966,25 @@ namespace RobTeach.Views
                                 WriteTrajectoryPointWithAnglesData(writer, trajectory.CirclePoint2);
                                 WriteTrajectoryPointWithAnglesData(writer, trajectory.CirclePoint3);
                              }
+                        }
+                        else if (trajectory.PrimitiveType == "Polygon")
+                        {
+                            for (int i = 0; i < trajectory.Points.Count - 1; i++)
+                            {
+                                Point3D p1 = trajectory.Points[i];
+                                Point3D p2 = trajectory.Points[i + 1];
+                                WritePointData(writer, new DxfPoint(p1.X, p1.Y, p1.Z));
+                                WritePointData(writer, new DxfPoint(p2.X, p2.Y, p2.Z));
+                            }
+
+                            // If the polygon is closed, add a line segment from the last point to the first point
+                            if (trajectory.OriginalDxfEntity is DxfLwPolyline polyline && polyline.IsClosed && trajectory.Points.Count > 2)
+                            {
+                                Point3D p1 = trajectory.Points[trajectory.Points.Count - 1];
+                                Point3D p2 = trajectory.Points[0];
+                                WritePointData(writer, new DxfPoint(p1.X, p1.Y, p1.Z));
+                                WritePointData(writer, new DxfPoint(p2.X, p2.Y, p2.Z));
+                            }
                         }
                         else // Unknown primitive type
                         {
