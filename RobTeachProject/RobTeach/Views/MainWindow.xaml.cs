@@ -896,7 +896,7 @@ namespace RobTeach.Views
             {
                 case "Line":
                     trajectory.Points.Clear();
-                    trajectory.Points.AddRange(_cadService.ConvertLineTrajectoryToPoints(trajectory));
+                    trajectory.Points.AddRange(_cadService.ConvertLineTrajectoryToPoints(trajectory).Select(p => new Point3D(p.X, p.Y, 0)));
                     break;
                 case "Arc":
                     trajectory.Points.Clear();
@@ -927,7 +927,7 @@ namespace RobTeach.Views
                             // We need to adapt _cadService.ConvertArcToPoints or use a similar discretization here.
 
                             // Re-using the logic from CadService.ConvertArcToPoints directly for now for simplicity:
-                            List<Point> arcPoints = new List<Point>();
+                            List<Point3D> arcPoints = new List<Point3D>();
                             double currentAngleDeg = startAngle;
                             double effectiveEndAngleDeg = endAngle;
 
@@ -977,7 +977,7 @@ namespace RobTeach.Views
                             if (sweepBackwards) {
                                 while (currentAngleDeg >= effectiveEndAngleDeg - Math.Abs(step)/2.0) { // Loop condition for backwards
                                     double radAngle = currentAngleDeg * Math.PI / 180.0;
-                                    arcPoints.Add(new Point(center.X + radius * Math.Cos(radAngle), center.Y + radius * Math.Sin(radAngle)));
+                                    arcPoints.Add(new Point3D(center.X + radius * Math.Cos(radAngle), center.Y + radius * Math.Sin(radAngle), center.Z));
                                     if (currentAngleDeg <= effectiveEndAngleDeg + 1e-5 && currentAngleDeg >= effectiveEndAngleDeg - 1e-5) break; // Reached end
                                     currentAngleDeg += step;
                                      if (currentAngleDeg < effectiveEndAngleDeg && currentAngleDeg > effectiveEndAngleDeg + step -1e-5 ) currentAngleDeg = effectiveEndAngleDeg; // Ensure last point
@@ -985,7 +985,7 @@ namespace RobTeach.Views
                             } else {
                                 while (currentAngleDeg <= effectiveEndAngleDeg + Math.Abs(step)/2.0) { // Loop condition for forwards
                                     double radAngle = currentAngleDeg * Math.PI / 180.0;
-                                    arcPoints.Add(new Point(center.X + radius * Math.Cos(radAngle), center.Y + radius * Math.Sin(radAngle)));
+                                    arcPoints.Add(new Point3D(center.X + radius * Math.Cos(radAngle), center.Y + radius * Math.Sin(radAngle), center.Z));
                                      if (currentAngleDeg <= effectiveEndAngleDeg + 1e-5 && currentAngleDeg >= effectiveEndAngleDeg - 1e-5) break; // Reached end
                                     currentAngleDeg += step;
                                     if (currentAngleDeg > effectiveEndAngleDeg && currentAngleDeg < effectiveEndAngleDeg + step - 1e-5) currentAngleDeg = effectiveEndAngleDeg; // Ensure last point
@@ -997,9 +997,9 @@ namespace RobTeach.Views
                         {
                             Debug.WriteLine($"[WARNING] PopulateTrajectoryPoints: Could not calculate arc parameters for trajectory. PrimitiveType: {trajectory.PrimitiveType}. Defaulting to line segments if P1,P2,P3 exist.");
                             // Fallback: add P1, P2, P3 as line segments if arc calculation fails
-                            if (trajectory.ArcPoint1 != null) trajectory.Points.Add(new Point(trajectory.ArcPoint1.Coordinates.X, trajectory.ArcPoint1.Coordinates.Y));
-                            if (trajectory.ArcPoint2 != null) trajectory.Points.Add(new Point(trajectory.ArcPoint2.Coordinates.X, trajectory.ArcPoint2.Coordinates.Y));
-                            if (trajectory.ArcPoint3 != null) trajectory.Points.Add(new Point(trajectory.ArcPoint3.Coordinates.X, trajectory.ArcPoint3.Coordinates.Y));
+                            if (trajectory.ArcPoint1 != null) trajectory.Points.Add(new Point3D(trajectory.ArcPoint1.Coordinates.X, trajectory.ArcPoint1.Coordinates.Y, trajectory.ArcPoint1.Coordinates.Z));
+                            if (trajectory.ArcPoint2 != null) trajectory.Points.Add(new Point3D(trajectory.ArcPoint2.Coordinates.X, trajectory.ArcPoint2.Coordinates.Y, trajectory.ArcPoint2.Coordinates.Z));
+                            if (trajectory.ArcPoint3 != null) trajectory.Points.Add(new Point3D(trajectory.ArcPoint3.Coordinates.X, trajectory.ArcPoint3.Coordinates.Y, trajectory.ArcPoint3.Coordinates.Z));
                         }
                     }
                     else
@@ -1019,7 +1019,7 @@ namespace RobTeach.Views
                     {
                         var (center, radius, normal) = circleParams.Value;
                         // Debug.WriteLine($"[JULES_DEBUG] PopulateTrajectoryPoints (Circle): Calculated Params: Center={center}, Radius={radius}, Normal={normal}");
-                        List<Point> circlePoints = new List<Point>();
+                        List<Point3D> circlePoints = new List<Point3D>();
 
                         DxfVector localXAxis;
                         double arbThreshold = 1.0 / 64.0;
@@ -1039,15 +1039,15 @@ namespace RobTeach.Views
                             DxfVector termY = new DxfVector(localYAxis.X * sinAngle, localYAxis.Y * sinAngle, localYAxis.Z * sinAngle);
                             DxfVector directionOnPlane_unscaled = termX + termY; // Assuming DxfVector + DxfVector is okay
                             DxfPoint pointOnCircle = center + new DxfVector(directionOnPlane_unscaled.X * radius, directionOnPlane_unscaled.Y * radius, directionOnPlane_unscaled.Z * radius);
-                            circlePoints.Add(new Point(pointOnCircle.X, pointOnCircle.Y));
+                            circlePoints.Add(new Point3D(pointOnCircle.X, pointOnCircle.Y, pointOnCircle.Z));
                             // Debug.WriteLine($"[JULES_DEBUG] PopulateTrajectoryPoints (Circle): angleDeg={angleDeg}, pointOnCircle={pointOnCircle}, Added to circlePoints. Count: {circlePoints.Count}");
                         }
 
                         if (circlePoints.Count > 0)
                         {
                             DxfPoint firstDxfPoint = center + new DxfVector(localXAxis.X * radius, localXAxis.Y * radius, localXAxis.Z * radius);
-                            Point firstPoint = new Point(firstDxfPoint.X, firstDxfPoint.Y);
-                            if (Point.Subtract(circlePoints.Last(), firstPoint).LengthSquared > 1e-6)
+                            Point3D firstPoint = new Point3D(firstDxfPoint.X, firstDxfPoint.Y, firstDxfPoint.Z);
+                            if (Math.Abs(circlePoints.Last().X - firstPoint.X) > 1e-6 || Math.Abs(circlePoints.Last().Y - firstPoint.Y) > 1e-6 || Math.Abs(circlePoints.Last().Z - firstPoint.Z) > 1e-6)
                             {
                                 circlePoints.Add(firstPoint);
                                 // Debug.WriteLine($"[JULES_DEBUG] PopulateTrajectoryPoints (Circle): Added closing point. Count: {circlePoints.Count}");
@@ -1060,15 +1060,15 @@ namespace RobTeach.Views
                     else
                     {
                         Debug.WriteLine($"[JULES_WARNING] PopulateTrajectoryPoints (Circle): Could not calculate circle parameters. Fallback to 3 points. P1={trajectory.CirclePoint1.Coordinates}, P2={trajectory.CirclePoint2.Coordinates}, P3={trajectory.CirclePoint3.Coordinates}");
-                        trajectory.Points.Add(new Point(trajectory.CirclePoint1.Coordinates.X, trajectory.CirclePoint1.Coordinates.Y));
+                        trajectory.Points.Add(new Point3D(trajectory.CirclePoint1.Coordinates.X, trajectory.CirclePoint1.Coordinates.Y, trajectory.CirclePoint1.Coordinates.Z));
                         // Debug.WriteLine($"[JULES_DEBUG] PopulateTrajectoryPoints (Circle Fallback): Added P1. Points count: {trajectory.Points.Count}");
-                        trajectory.Points.Add(new Point(trajectory.CirclePoint2.Coordinates.X, trajectory.CirclePoint2.Coordinates.Y));
+                        trajectory.Points.Add(new Point3D(trajectory.CirclePoint2.Coordinates.X, trajectory.CirclePoint2.Coordinates.Y, trajectory.CirclePoint2.Coordinates.Z));
                         // Debug.WriteLine($"[JULES_DEBUG] PopulateTrajectoryPoints (Circle Fallback): Added P2. Points count: {trajectory.Points.Count}");
-                        trajectory.Points.Add(new Point(trajectory.CirclePoint3.Coordinates.X, trajectory.CirclePoint3.Coordinates.Y));
+                        trajectory.Points.Add(new Point3D(trajectory.CirclePoint3.Coordinates.X, trajectory.CirclePoint3.Coordinates.Y, trajectory.CirclePoint3.Coordinates.Z));
                         // Debug.WriteLine($"[JULES_DEBUG] PopulateTrajectoryPoints (Circle Fallback): Added P3. Points count: {trajectory.Points.Count}");
                         if(trajectory.Points.Count > 1)
                         {
-                           trajectory.Points.Add(new Point(trajectory.CirclePoint1.Coordinates.X, trajectory.CirclePoint1.Coordinates.Y));
+                           trajectory.Points.Add(new Point3D(trajectory.CirclePoint1.Coordinates.X, trajectory.CirclePoint1.Coordinates.Y, trajectory.CirclePoint1.Coordinates.Z));
                            // Debug.WriteLine($"[JULES_DEBUG] PopulateTrajectoryPoints (Circle Fallback): Closed with P1. Points count: {trajectory.Points.Count}");
                         }
                     }
@@ -1094,9 +1094,9 @@ namespace RobTeach.Views
                     // If OriginalDxfEntity exists and is of a known DxfEntityType, could fall back to old methods:
                     if (trajectory.OriginalDxfEntity != null) {
                         switch (trajectory.OriginalDxfEntity) {
-                            case DxfLine line: trajectory.Points.AddRange(_cadService.ConvertLineToPoints(line)); break;
-                            case DxfArc arc: trajectory.Points.AddRange(_cadService.ConvertArcToPoints(arc, TrajectoryPointResolutionAngle)); break;
-                            case DxfCircle circle: trajectory.Points.AddRange(_cadService.ConvertCircleToPoints(circle, TrajectoryPointResolutionAngle)); break;
+                            case DxfLine line: trajectory.Points.AddRange(_cadService.ConvertLineToPoints(line).Select(p => new Point3D(p.X, p.Y, 0))); break;
+                            case DxfArc arc: trajectory.Points.AddRange(_cadService.ConvertArcToPoints(arc, TrajectoryPointResolutionAngle).Select(p => new Point3D(p.X, p.Y, 0))); break;
+                            case DxfCircle circle: trajectory.Points.AddRange(_cadService.ConvertCircleToPoints(circle, TrajectoryPointResolutionAngle).Select(p => new Point3D(p.X, p.Y, 0))); break;
                         }
                     }
                     break;
