@@ -1068,6 +1068,19 @@ namespace RobTeach.Views
                     }
                     // Debug.WriteLine($"[JULES_DEBUG] PopulateTrajectoryPoints (Circle): Final trajectory.Points.Count = {trajectory.Points.Count}");
                     break;
+                case "Polygon":
+                    if (trajectory.OriginalDxfEntity is DxfLwPolyline polyline)
+                    {
+                        var vertices = polyline.Vertices.Select(v => new System.Windows.Point(v.X, v.Y)).ToList();
+                        int startIndex = FindBottomLeftVertexIndex(vertices);
+                        var orderedVertices = new List<System.Windows.Point>();
+                        for (int i = 0; i < vertices.Count; i++)
+                        {
+                            orderedVertices.Add(vertices[(startIndex + i) % vertices.Count]);
+                        }
+                        trajectory.Points.AddRange(orderedVertices);
+                    }
+                    break;
                 default:
                     // For other types or if PrimitiveType is not set, Points will remain empty or could be populated from OriginalDxfEntity if needed
                     // For now, we rely on the specific Convert<Primitive>TrajectoryToPoints methods.
@@ -4072,16 +4085,7 @@ namespace RobTeach.Views
                 PrimitiveType = "Polygon"
             };
 
-            var vertices = polyline.Vertices.Select(v => new System.Windows.Point(v.X, v.Y)).ToList();
-            int startIndex = FindBottomLeftVertexIndex(vertices);
-            var orderedVertices = new List<System.Windows.Point>();
-            for (int i = 0; i < vertices.Count; i++)
-            {
-                orderedVertices.Add(vertices[(startIndex + i) % vertices.Count]);
-            }
-            newTrajectory.Points = orderedVertices;
-
-            // No need to call PopulateTrajectoryPoints for polygons as it's handled differently
+            // The points are now populated in PopulateTrajectoryPoints
             newTrajectory.Runtime = TrajectoryUtils.CalculateMinRuntime(newTrajectory);
 
             return newTrajectory;
