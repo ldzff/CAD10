@@ -1888,6 +1888,10 @@ namespace RobTeach.Views
                             newTrajectory = CreatePolygonTrajectoryFromPolyline(polyline);
                             currentPass.Trajectories.Add(newTrajectory);
                             trajectoryToSelect = newTrajectory;
+                            PopulateTrajectoryPoints(newTrajectory);
+                            newTrajectory.Runtime = TrajectoryUtils.CalculateMinRuntime(newTrajectory);
+                            AppLogger.Log($"Trajectory added to pass '{currentPass.PassName}': Type '{newTrajectory.PrimitiveType}', EntityHandle '{newTrajectory.OriginalEntityHandle}'.", LogLevel.Info);
+                            isConfigurationDirty = true;
                             break;
                         case DxfLine line:
                             newTrajectory.PrimitiveType = "Line";
@@ -2006,14 +2010,13 @@ namespace RobTeach.Views
                             newTrajectory.PrimitiveType = dxfEntity.GetType().Name;
                             break;
                     }
-                    // This block is now redundant as all handled types add themselves to the trajectory list.
-                    // if (dxfEntity.GetType() != typeof(DxfLwPolyline))
-                    // {
-                    //     PopulateTrajectoryPoints(newTrajectory);
-                    //     newTrajectory.Runtime = TrajectoryUtils.CalculateMinRuntime(newTrajectory); // Set default runtime
-                    //     AppLogger.Log($"Trajectory added to pass '{currentPass.PassName}': Type '{newTrajectory.PrimitiveType}', EntityHandle '{newTrajectory.OriginalEntityHandle}'.", LogLevel.Info);
-                    //     isConfigurationDirty = true;
-                    // }
+                    if (trajectoryToSelect != null)
+                    {
+                        PopulateTrajectoryPoints(trajectoryToSelect);
+                        trajectoryToSelect.Runtime = TrajectoryUtils.CalculateMinRuntime(trajectoryToSelect); // Set default runtime
+                        AppLogger.Log($"Trajectory added to pass '{currentPass.PassName}': Type '{trajectoryToSelect.PrimitiveType}', EntityHandle '{trajectoryToSelect.OriginalEntityHandle}'.", LogLevel.Info);
+                        isConfigurationDirty = true;
+                    }
                 }
 
                 RefreshCurrentPassTrajectoriesListBox();
