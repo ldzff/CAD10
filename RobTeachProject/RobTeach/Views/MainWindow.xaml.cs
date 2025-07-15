@@ -3974,7 +3974,50 @@ namespace RobTeach.Views
                         }
                         else if (trajectory.PrimitiveType == "Polygon")
                         {
-                            // This space is intentionally left blank because the line segments are created below.
+                            double totalLength = TrajectoryUtils.CalculateTrajectoryLength(trajectory);
+                            float speed = (float)(totalLength / trajectory.Runtime);
+
+                            for (int i = 0; i < trajectory.Points.Count - 1; i++)
+                            {
+                                primitiveIndexInPass++;
+                                writer.WriteLine(((float)primitiveIndexInPass).ToString("F3"));
+                                writer.WriteLine((1.0f).ToString("F3")); // Primitive Type: Line
+                                writer.WriteLine((trajectory.UpperNozzleGasOn ? 11.0f : 10.0f).ToString("F3"));
+                                writer.WriteLine((trajectory.UpperNozzleLiquidOn ? 12.0f : 10.0f).ToString("F3"));
+                                writer.WriteLine((trajectory.LowerNozzleGasOn ? 21.0f : 20.0f).ToString("F3"));
+                                writer.WriteLine((trajectory.LowerNozzleLiquidOn ? 22.0f : 10.0f).ToString("F3"));
+                                writer.WriteLine(speed.ToString("F3"));
+
+                                Point3D p1 = trajectory.Points[i];
+                                Point3D p2 = trajectory.Points[i + 1];
+                                WritePointData(writer, new DxfPoint(p1.X, p1.Y, p1.Z));
+                                WritePointData(writer, new DxfPoint(p2.X, p2.Y, p2.Z));
+
+                                writer.WriteLine(0.0f.ToString("F3"));
+                                writer.WriteLine(0.0f.ToString("F3"));
+                                writer.WriteLine(0.0f.ToString("F3"));
+                            }
+
+                            if (trajectory.OriginalDxfEntity is DxfLwPolyline polyline && polyline.IsClosed && trajectory.Points.Count > 2)
+                            {
+                                primitiveIndexInPass++;
+                                writer.WriteLine(((float)primitiveIndexInPass).ToString("F3"));
+                                writer.WriteLine((1.0f).ToString("F3")); // Primitive Type: Line
+                                writer.WriteLine((trajectory.UpperNozzleGasOn ? 11.0f : 10.0f).ToString("F3"));
+                                writer.WriteLine((trajectory.UpperNozzleLiquidOn ? 12.0f : 10.0f).ToString("F3"));
+                                writer.WriteLine((trajectory.LowerNozzleGasOn ? 21.0f : 20.0f).ToString("F3"));
+                                writer.WriteLine((trajectory.LowerNozzleLiquidOn ? 22.0f : 10.0f).ToString("F3"));
+                                writer.WriteLine(speed.ToString("F3"));
+
+                                Point3D p1 = trajectory.Points[trajectory.Points.Count - 1];
+                                Point3D p2 = trajectory.Points[0];
+                                WritePointData(writer, new DxfPoint(p1.X, p1.Y, p1.Z));
+                                WritePointData(writer, new DxfPoint(p2.X, p2.Y, p2.Z));
+
+                                writer.WriteLine(0.0f.ToString("F3"));
+                                writer.WriteLine(0.0f.ToString("F3"));
+                                writer.WriteLine(0.0f.ToString("F3"));
+                            }
                         }
                         else // Unknown primitive type
                         {
@@ -3991,54 +4034,6 @@ namespace RobTeach.Views
                         }
                     }
 
-                    // Handle polygons separately
-                    foreach (var trajectory in pass.Trajectories.Where(t => t.PrimitiveType == "Polygon"))
-                    {
-                        double totalLength = TrajectoryUtils.CalculateTrajectoryLength(trajectory);
-                        float speed = (float)(totalLength / trajectory.Runtime);
-
-                        for (int i = 0; i < trajectory.Points.Count - 1; i++)
-                        {
-                            primitiveIndexInPass++;
-                            writer.WriteLine(((float)primitiveIndexInPass).ToString("F3"));
-                            writer.WriteLine((1.0f).ToString("F3")); // Primitive Type: Line
-                            writer.WriteLine((trajectory.UpperNozzleGasOn ? 11.0f : 10.0f).ToString("F3"));
-                            writer.WriteLine((trajectory.UpperNozzleLiquidOn ? 12.0f : 10.0f).ToString("F3"));
-                            writer.WriteLine((trajectory.LowerNozzleGasOn ? 21.0f : 20.0f).ToString("F3"));
-                            writer.WriteLine((trajectory.LowerNozzleLiquidOn ? 22.0f : 10.0f).ToString("F3"));
-                            writer.WriteLine(speed.ToString("F3"));
-
-                            Point3D p1 = trajectory.Points[i];
-                            Point3D p2 = trajectory.Points[i + 1];
-                            WritePointData(writer, new DxfPoint(p1.X, p1.Y, p1.Z));
-                            WritePointData(writer, new DxfPoint(p2.X, p2.Y, p2.Z));
-
-                            writer.WriteLine(0.0f.ToString("F3"));
-                            writer.WriteLine(0.0f.ToString("F3"));
-                            writer.WriteLine(0.0f.ToString("F3"));
-                        }
-
-                        if (trajectory.OriginalDxfEntity is DxfLwPolyline polyline && polyline.IsClosed && trajectory.Points.Count > 2)
-                        {
-                            primitiveIndexInPass++;
-                            writer.WriteLine(((float)primitiveIndexInPass).ToString("F3"));
-                            writer.WriteLine((1.0f).ToString("F3")); // Primitive Type: Line
-                            writer.WriteLine((trajectory.UpperNozzleGasOn ? 11.0f : 10.0f).ToString("F3"));
-                            writer.WriteLine((trajectory.UpperNozzleLiquidOn ? 12.0f : 10.0f).ToString("F3"));
-                            writer.WriteLine((trajectory.LowerNozzleGasOn ? 21.0f : 20.0f).ToString("F3"));
-                            writer.WriteLine((trajectory.LowerNozzleLiquidOn ? 22.0f : 10.0f).ToString("F3"));
-                            writer.WriteLine(speed.ToString("F3"));
-
-                            Point3D p1 = trajectory.Points[trajectory.Points.Count - 1];
-                            Point3D p2 = trajectory.Points[0];
-                            WritePointData(writer, new DxfPoint(p1.X, p1.Y, p1.Z));
-                            WritePointData(writer, new DxfPoint(p2.X, p2.Y, p2.Z));
-
-                            writer.WriteLine(0.0f.ToString("F3"));
-                            writer.WriteLine(0.0f.ToString("F3"));
-                            writer.WriteLine(0.0f.ToString("F3"));
-                        }
-                    }
                 }
             }
             return dataFilePath; // Return the actual path where the file is saved
