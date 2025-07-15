@@ -142,6 +142,14 @@ namespace RobTeach.Services
                     trajectory.OriginalCircleRadius = GetDoubleProperty(root, "OriginalCircleRadius");
                     trajectory.OriginalCircleNormal = GetDxfVectorProperty(root, "OriginalCircleNormal", options);
                 }
+                else if (trajectory.PrimitiveType == "Polygon")
+                {
+                    if (root.TryGetProperty("Points", out JsonElement pointsElement))
+                    {
+                        trajectory.Points = JsonSerializer.Deserialize<System.Collections.Generic.List<Point3D>>(pointsElement.GetRawText(), options) ?? new System.Collections.Generic.List<Point3D>();
+                    }
+                    trajectory.PolygonZ = GetDoubleProperty(root, "PolygonZ");
+                }
 
                 // After all properties of Trajectory are deserialized,
                 // create and assign OriginalDxfEntity based on these properties.
@@ -309,6 +317,11 @@ namespace RobTeach.Services
                     writer.WriteNumber("OriginalCircleRadius", value.OriginalCircleRadius);
                     writer.WritePropertyName("OriginalCircleNormal");
                     JsonSerializer.Serialize(writer, value.OriginalCircleNormal, options);
+                    break;
+                case "Polygon":
+                    writer.WritePropertyName("Points");
+                    JsonSerializer.Serialize(writer, value.Points, options);
+                    writer.WriteNumber("PolygonZ", value.PolygonZ);
                     break;
             }
 
