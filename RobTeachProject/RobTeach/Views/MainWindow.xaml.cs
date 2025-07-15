@@ -3991,7 +3991,7 @@ namespace RobTeach.Views
                     // Handle polygons separately
                     foreach (var trajectory in pass.Trajectories.Where(t => t.PrimitiveType == "Polygon"))
                     {
-                        double totalLength = CalculateTrajectoryLength(trajectory);
+                        double totalLength = TrajectoryUtils.CalculateTrajectoryLength(trajectory);
                         float speed = (float)(totalLength / trajectory.Runtime);
 
                         for (int i = 0; i < trajectory.Points.Count - 1; i++)
