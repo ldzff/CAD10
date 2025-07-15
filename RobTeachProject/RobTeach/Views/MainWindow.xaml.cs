@@ -1885,15 +1885,9 @@ namespace RobTeach.Views
                     switch (dxfEntity)
                     {
                         case DxfLwPolyline polyline:
-                            var polygonTrajectory = CreatePolygonTrajectoryFromPolyline(polyline);
-                            currentPass.Trajectories.Add(polygonTrajectory);
-                            trajectoryToSelect = polygonTrajectory;
-                            RefreshCurrentPassTrajectoriesListBox();
-                            CurrentPassTrajectoriesListBox.SelectedItem = trajectoryToSelect;
-                            CurrentPassTrajectoriesListBox.Items.Refresh();
-                            RefreshCadCanvasHighlights();
-                            UpdateDirectionIndicator();
-                            UpdateOrderNumberLabels();
+                            newTrajectory = CreatePolygonTrajectoryFromPolyline(polyline);
+                            currentPass.Trajectories.Add(newTrajectory);
+                            trajectoryToSelect = newTrajectory;
                             break;
                         case DxfLine line:
                             newTrajectory.PrimitiveType = "Line";
