@@ -17,7 +17,7 @@ namespace RobTeach.Utils
             {
                 var p1 = trajectory.Points[i];
                 var p2 = trajectory.Points[i + 1];
-                length += (p2 - p1).Length;
+                length += Math.Sqrt((p2 - p1).LengthSquared());
             }
             return length / 1000.0; // Assuming points are in mm, convert to meters
         }
