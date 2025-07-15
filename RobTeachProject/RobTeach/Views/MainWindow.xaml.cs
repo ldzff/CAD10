@@ -1898,9 +1898,8 @@ namespace RobTeach.Views
                     switch (dxfEntity)
                     {
                         case DxfLwPolyline polyline:
-                            var polygonTrajectory = CreatePolygonTrajectoryFromPolyline(polyline);
-                            currentPass.Trajectories.Add(polygonTrajectory);
-                            trajectoryToSelect = polygonTrajectory;
+                            trajectoryToSelect = CreatePolygonTrajectoryFromPolyline(polyline);
+                            currentPass.Trajectories.Add(trajectoryToSelect);
                             break;
                         case DxfLine line:
                             newTrajectory.PrimitiveType = "Line";
@@ -4085,7 +4084,16 @@ namespace RobTeach.Views
                 PrimitiveType = "Polygon"
             };
 
-            // The points are now populated in PopulateTrajectoryPoints
+            var vertices = polyline.Vertices.Select(v => new System.Windows.Point(v.X, v.Y)).ToList();
+            int startIndex = FindBottomLeftVertexIndex(vertices);
+            var orderedVertices = new List<System.Windows.Point>();
+            for (int i = 0; i < vertices.Count; i++)
+            {
+                orderedVertices.Add(vertices[(startIndex + i) % vertices.Count]);
+            }
+            newTrajectory.Points = orderedVertices;
+
+            // No need to call PopulateTrajectoryPoints for polygons as it's handled differently
             newTrajectory.Runtime = TrajectoryUtils.CalculateMinRuntime(newTrajectory);
 
             return newTrajectory;
