@@ -369,14 +369,15 @@ namespace RobTeach.Views
                 System.Windows.Point anchorPoint;
                 if (selectedTrajectory.PrimitiveType == "Line" && selectedTrajectory.Points.Count >= 2)
                 {
-                    System.Windows.Point p_start = selectedTrajectory.Points[0];
-                    System.Windows.Point p_end = selectedTrajectory.Points[selectedTrajectory.Points.Count - 1];
-                    anchorPoint = new System.Windows.Point((p_start.X + p_end.X) / 2, (p_start.Y + p_end.Y) / 2);
+                    Point3D p_start_3d = selectedTrajectory.Points[0];
+                    Point3D p_end_3d = selectedTrajectory.Points[selectedTrajectory.Points.Count - 1];
+                    anchorPoint = new System.Windows.Point((p_start_3d.X + p_end_3d.X) / 2, (p_start_3d.Y + p_end_3d.Y) / 2);
                 }
                 else // For Arcs, Circles, or Lines with < 2 points (though points.Any() is already checked)
                 {
                     int midIndex = selectedTrajectory.Points.Count / 2; // Integer division gives lower midpoint for even counts
-                    anchorPoint = selectedTrajectory.Points[midIndex];
+                    Point3D p_mid_3d = selectedTrajectory.Points[midIndex];
+                    anchorPoint = new Point(p_mid_3d.X, p_mid_3d.Y);
                 }
 
                 // Define offsets - these might need tweaking after visual review
@@ -512,7 +513,7 @@ namespace RobTeach.Views
                     StrokeThickness = 1.5 * scale
                 };
 
-                List<System.Windows.Point> points = trajectoryInLoop.Points;
+                List<Point> points = trajectoryInLoop.Points.Select(p => new Point(p.X, p.Y)).ToList();
                 System.Windows.Point arrowStartPoint = new System.Windows.Point();
                 System.Windows.Point arrowEndPoint = new System.Windows.Point();
                 bool addIndicator = false;
@@ -730,8 +731,7 @@ namespace RobTeach.Views
                 }
                 else if (selectedTrajectory.PrimitiveType == "Polygon" && selectedTrajectory.Points.Count > 0)
                 {
-                    // System.Windows.Point has no Z, so we display 0.0 for now.
-                    PolygonZTextBox.Text = "0.000";
+                    PolygonZTextBox.Text = selectedTrajectory.PolygonZ.ToString("F3");
                 }
 
                 // Set Tags for Z-coordinate TextBoxes
@@ -745,7 +745,7 @@ namespace RobTeach.Views
                 if (selectedTrajectory.PrimitiveType == "Polygon")
                 {
                     PolygonVerticesGroupBox.Visibility = Visibility.Visible;
-                    PolygonVerticesListBox.ItemsSource = selectedTrajectory.Points;
+                    PolygonVerticesListBox.ItemsSource = selectedTrajectory.Points.Select(p => new Point(p.X, p.Y)).ToList();
                     PolygonVerticesListBox.Items.Refresh();
                 }
                 else
@@ -875,7 +875,7 @@ namespace RobTeach.Views
                     {
                         selectedTrajectory.Points.Reverse();
                         // Update the listbox directly since UpdateSelectedTrajectoryDetailUI would re-order it
-                        PolygonVerticesListBox.ItemsSource = selectedTrajectory.Points;
+                        PolygonVerticesListBox.ItemsSource = selectedTrajectory.Points.Select(p => new Point(p.X, p.Y)).ToList();
                         PolygonVerticesListBox.Items.Refresh();
                     }
 
@@ -1078,9 +1078,9 @@ namespace RobTeach.Views
                     if (trajectory.OriginalDxfEntity is DxfLwPolyline polyline)
                     {
                         trajectory.Points.Clear();
-                        var vertices = polyline.Vertices.Select(v => new System.Windows.Point(v.X, v.Y)).ToList();
-                        int startIndex = FindBottomLeftVertexIndex(vertices);
-                        var orderedVertices = new List<System.Windows.Point>();
+                        var vertices = polyline.Vertices.Select(v => new Point3D(v.X, v.Y, polyline.Elevation)).ToList();
+                        int startIndex = FindBottomLeftVertexIndex(vertices.Select(p => new Point(p.X, p.Y)).ToList());
+                        var orderedVertices = new List<Point3D>();
                         for (int i = 0; i < vertices.Count; i++)
                         {
                             orderedVertices.Add(vertices[(startIndex + i) % vertices.Count]);
@@ -1452,27 +1452,18 @@ namespace RobTeach.Views
         {
             if (double.TryParse(PolygonZTextBox.Text, out double newZ))
             {
-                bool changed = false;
-                var newPoints = new List<System.Windows.Point>();
-                foreach (var point in selectedTrajectory.Points)
+                if (selectedTrajectory.PolygonZ != newZ)
                 {
-                    // This is a simplification. System.Windows.Point does not have a Z property.
-                    // The Z coordinate must be stored elsewhere or this feature needs a more complex implementation
-                    // with a custom Point3D struct. For now, we assume Z is 0.
-                    changed = true; // Assume change if the text is updated
-                    newPoints.Add(new System.Windows.Point(point.X, point.Y));
-                }
+                    double oldZ = selectedTrajectory.PolygonZ;
+                    selectedTrajectory.PolygonZ = newZ;
 
-                if (changed)
-                {
-                    var newPointsAsWindowsPoint = new List<System.Windows.Point>();
-                    foreach (var p in newPoints)
+                    // Update the Z coordinate of all points in the polygon
+                    for (int i = 0; i < selectedTrajectory.Points.Count; i++)
                     {
-                        newPointsAsWindowsPoint.Add(new System.Windows.Point(p.X, p.Y));
+                        selectedTrajectory.Points[i] = new Point3D(selectedTrajectory.Points[i].X, selectedTrajectory.Points[i].Y, newZ);
                     }
-                    selectedTrajectory.Points = newPointsAsWindowsPoint;
 
-                    AppLogger.Log($"Trajectory '{selectedTrajectory.ToString()}' Polygon points Z set to {newZ:F3} in pass '{_currentConfiguration.SprayPasses[_currentConfiguration.CurrentPassIndex].PassName}'.");
+                    AppLogger.Log($"Trajectory '{selectedTrajectory.ToString()}' Polygon Z changed from {oldZ:F3} to {newZ:F3} in pass '{_currentConfiguration.SprayPasses[_currentConfiguration.CurrentPassIndex].PassName}'.");
                     isConfigurationDirty = true;
                     CurrentPassTrajectoriesListBox.Items.Refresh();
                     PolygonVerticesListBox.ItemsSource = selectedTrajectory.Points;
@@ -1484,11 +1475,7 @@ namespace RobTeach.Views
                 string msg = "Invalid Polygon Z value. Please enter a valid number.";
                 AppLogger.Log(msg, LogLevel.Error);
                 MessageBox.Show(msg, "Input Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                if (selectedTrajectory.Points.Count > 0)
-                {
-                    // System.Windows.Point has no Z, so we display 0.0 for now.
-                    PolygonZTextBox.Text = "0.000";
-                }
+                PolygonZTextBox.Text = selectedTrajectory.PolygonZ.ToString("F3");
             }
         }
     }
@@ -3643,9 +3630,9 @@ namespace RobTeach.Views
                 for (int i = 0; i < pass.Trajectories.Count; i++)
                 {
                     var trajectory = pass.Trajectories[i];
-                    if (trajectory.OriginalDxfEntity == null)
+                    if (trajectory.OriginalDxfEntity == null && trajectory.PrimitiveType != "Polygon")
                     {
-                        Debug.WriteLine($"[DEBUG] ReconcileTrajectoryEntities: Trajectory {i} in pass '{pass.PassName}' has null OriginalDxfEntity.");
+                        Debug.WriteLine($"[DEBUG] ReconcileTrajectoryEntities: Trajectory {i} in pass '{pass.PassName}' has null OriginalDxfEntity and is not a Polygon.");
                         continue;
                     }
 
@@ -3654,7 +3641,22 @@ namespace RobTeach.Views
 
                     for (int j = 0; j < availableDocEntities.Count; j++)
                     {
-                        if (AreEntitiesGeometricallyEquivalent(trajectory.OriginalDxfEntity, availableDocEntities[j]))
+                        if (trajectory.PrimitiveType == "Polygon")
+                        {
+                            if (availableDocEntities[j] is DxfLwPolyline polyline)
+                            {
+                                // A simple comparison for polygons could be to check if they have the same number of vertices
+                                // and if the first vertex is the same. This is not a robust check, but it's a start.
+                                if (polyline.Vertices.Count == trajectory.Points.Count &&
+                                    PointEquals(new DxfPoint(polyline.Vertices[0].X, polyline.Vertices[0].Y, polyline.Elevation), new DxfPoint(trajectory.Points[0].X, trajectory.Points[0].Y, trajectory.PolygonZ)))
+                                {
+                                    matchedEntity = availableDocEntities[j];
+                                    matchedEntityIndexInAvailableList = j;
+                                    break;
+                                }
+                            }
+                        }
+                        else if (AreEntitiesGeometricallyEquivalent(trajectory.OriginalDxfEntity, availableDocEntities[j]))
                         {
                             matchedEntity = availableDocEntities[j];
                             matchedEntityIndexInAvailableList = j;
@@ -3672,7 +3674,7 @@ namespace RobTeach.Views
                     {
                         // If no match, the trajectory.OriginalDxfEntity remains the deserialized instance.
                         // Highlighting will likely fail for this specific entity.
-                        Debug.WriteLine($"[WARNING] ReconcileTrajectoryEntities: Could not find a matching live entity for deserialized {trajectory.OriginalDxfEntity.GetType().Name}.");
+                        Debug.WriteLine($"[WARNING] ReconcileTrajectoryEntities: Could not find a matching live entity for deserialized {trajectory.PrimitiveType}.");
                     }
                 }
                 // Debug.WriteLine($"[JULES_DEBUG] ReconcileTrajectoryEntities: Finished processing pass '{pass.PassName}'. Final trajectory order for this pass:");
@@ -4118,12 +4120,13 @@ namespace RobTeach.Views
                 OriginalDxfEntity = polyline,
                 EntityType = polyline.GetType().Name,
                 IsReversed = false,
-                PrimitiveType = "Polygon"
+                PrimitiveType = "Polygon",
+                PolygonZ = polyline.Elevation
             };
 
-            var vertices = polyline.Vertices.Select(v => new System.Windows.Point(v.X, v.Y)).ToList();
-            int startIndex = FindBottomLeftVertexIndex(vertices);
-            var orderedVertices = new List<System.Windows.Point>();
+            var vertices = polyline.Vertices.Select(v => new Point3D(v.X, v.Y, polyline.Elevation)).ToList();
+            int startIndex = FindBottomLeftVertexIndex(vertices.Select(p => new Point(p.X, p.Y)).ToList());
+            var orderedVertices = new List<Point3D>();
             for (int i = 0; i < vertices.Count; i++)
             {
                 orderedVertices.Add(vertices[(startIndex + i) % vertices.Count]);
@@ -4136,7 +4139,7 @@ namespace RobTeach.Views
             return newTrajectory;
         }
 
-        private int FindBottomLeftVertexIndex(List<System.Windows.Point> vertices)
+        private int FindBottomLeftVertexIndex(List<Point> vertices)
         {
             if (vertices == null || vertices.Count == 0) return -1;
 

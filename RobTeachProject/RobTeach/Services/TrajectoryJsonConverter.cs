@@ -142,13 +142,6 @@ namespace RobTeach.Services
                     trajectory.OriginalCircleRadius = GetDoubleProperty(root, "OriginalCircleRadius");
                     trajectory.OriginalCircleNormal = GetDxfVectorProperty(root, "OriginalCircleNormal", options);
                 }
-                else if (trajectory.PrimitiveType == "Polygon")
-                {
-                    if (root.TryGetProperty("Points", out JsonElement pointsElement))
-                    {
-                        trajectory.Points = JsonSerializer.Deserialize<System.Collections.Generic.List<System.Windows.Point>>(pointsElement.GetRawText(), options) ?? new System.Collections.Generic.List<System.Windows.Point>();
-                    }
-                }
 
                 // After all properties of Trajectory are deserialized,
                 // create and assign OriginalDxfEntity based on these properties.
@@ -212,12 +205,6 @@ namespace RobTeach.Services
                             // One could attempt to use the 3 points here as a fallback, but it might lead to the same reconciliation issues.
                             System.Diagnostics.Debug.WriteLine($"[TrajectoryJsonConverter] Read: Could not reconstruct DxfCircle for trajectory {trajectory.OriginalEntityHandle} as OriginalCircleRadius is invalid or not set. OriginalDxfEntity will be null.");
                         }
-                        break;
-                    case "Polygon":
-                        // For polygons, the Points list is deserialized directly.
-                        // We don't reconstruct the DxfLwPolyline entity from the points here,
-                        // as the reconciliation process will match it to the live entity from the DXF.
-                        // If there's no DXF loaded, the points are still available for other uses.
                         break;
                     case "LwPolyline": // Assuming LwPolyline data would be deserialized onto Trajectory if supported
                         // This part needs LwPolyline specific properties on Trajectory object if we want to reconstruct it
@@ -322,10 +309,6 @@ namespace RobTeach.Services
                     writer.WriteNumber("OriginalCircleRadius", value.OriginalCircleRadius);
                     writer.WritePropertyName("OriginalCircleNormal");
                     JsonSerializer.Serialize(writer, value.OriginalCircleNormal, options);
-                    break;
-                case "Polygon":
-                    writer.WritePropertyName("Points");
-                    JsonSerializer.Serialize(writer, value.Points, options);
                     break;
             }
 

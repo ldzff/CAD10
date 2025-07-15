@@ -36,7 +36,8 @@ namespace RobTeach.Models
         /// as geometric parameters below should be used for reconstruction.
         /// </summary>
         [JsonIgnore]
-        public List<System.Windows.Point> Points { get; set; } = new List<System.Windows.Point>();
+        public List<Point3D> Points { get; set; } = new List<Point3D>();
+        public double PolygonZ { get; set; } = 0.0;
 
         /// <summary>
         /// Gets or sets the type of the primitive (e.g., "Line", "Arc", "Circle").
