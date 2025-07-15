@@ -453,13 +453,18 @@ namespace RobTeach.Views
             UpdateSelectedTrajectoryDetailUI(); // Renamed: Update nozzle UI as selected trajectory might change
         }
 
+        private bool _isSelectionChangeHandled = false;
         private void CurrentPassTrajectoriesListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (_isSelectionChangeHandled) return;
+
+            _isSelectionChangeHandled = true;
             Trace.WriteLine("++++ CurrentPassTrajectoriesListBox_SelectionChanged Fired ++++");
             Trace.Flush();
             UpdateSelectedTrajectoryDetailUI(); // Renamed
             UpdateDirectionIndicator(); // Add call to update direction indicator
             RefreshCadCanvasHighlights(); // <-- THIS LINE IS ALREADY HERE
+            _isSelectionChangeHandled = false;
         }
 
         private void UpdateDirectionIndicator()
