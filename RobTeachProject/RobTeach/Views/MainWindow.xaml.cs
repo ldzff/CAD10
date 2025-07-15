@@ -2361,6 +2361,21 @@ namespace RobTeach.Views
                     // Populate points for all trajectories in the loaded configuration
                     if (_currentConfiguration != null && _currentConfiguration.SprayPasses != null)
                     {
+                        foreach (var pass in _currentConfiguration.SprayPasses)
+                        {
+                            if (pass.Trajectories != null)
+                            {
+                                foreach (var trajectory in pass.Trajectories)
+                                {
+                                    PopulateTrajectoryPoints(trajectory);
+                                }
+                            }
+                        }
+                    }
+
+                    // Populate points for all trajectories in the loaded configuration
+                    if (_currentConfiguration != null && _currentConfiguration.SprayPasses != null)
+                    {
                         // Debug.WriteLine("[JULES_DEBUG] Populating points for loaded trajectories.");
                         foreach (var pass in _currentConfiguration.SprayPasses)
                         {
