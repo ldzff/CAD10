@@ -1894,7 +1894,7 @@ namespace RobTeach.Views
                             RefreshCadCanvasHighlights();
                             UpdateDirectionIndicator();
                             UpdateOrderNumberLabels();
-                            return;
+                            break;
                         case DxfLine line:
                             newTrajectory.PrimitiveType = "Line";
                             double p1DistSq = line.P1.X * line.P1.X + line.P1.Y * line.P1.Y + line.P1.Z * line.P1.Z;
