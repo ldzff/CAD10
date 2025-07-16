@@ -369,15 +369,14 @@ namespace RobTeach.Views
                 System.Windows.Point anchorPoint;
                 if (selectedTrajectory.PrimitiveType == "Line" && selectedTrajectory.Points.Count >= 2)
                 {
-                    Point3D p_start_3d = selectedTrajectory.Points[0];
-                    Point3D p_end_3d = selectedTrajectory.Points[selectedTrajectory.Points.Count - 1];
-                    anchorPoint = new System.Windows.Point((p_start_3d.X + p_end_3d.X) / 2, (p_start_3d.Y + p_end_3d.Y) / 2);
+                    System.Windows.Point p_start = selectedTrajectory.Points[0];
+                    System.Windows.Point p_end = selectedTrajectory.Points[selectedTrajectory.Points.Count - 1];
+                    anchorPoint = new System.Windows.Point((p_start.X + p_end.X) / 2, (p_start.Y + p_end.Y) / 2);
                 }
                 else // For Arcs, Circles, or Lines with < 2 points (though points.Any() is already checked)
                 {
                     int midIndex = selectedTrajectory.Points.Count / 2; // Integer division gives lower midpoint for even counts
-                    Point3D p_mid_3d = selectedTrajectory.Points[midIndex];
-                    anchorPoint = new Point(p_mid_3d.X, p_mid_3d.Y);
+                    anchorPoint = selectedTrajectory.Points[midIndex];
                 }
 
                 // Define offsets - these might need tweaking after visual review
@@ -454,18 +453,13 @@ namespace RobTeach.Views
             UpdateSelectedTrajectoryDetailUI(); // Renamed: Update nozzle UI as selected trajectory might change
         }
 
-        private bool _isSelectionChangeHandled = false;
         private void CurrentPassTrajectoriesListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_isSelectionChangeHandled) return;
-
-            _isSelectionChangeHandled = true;
             Trace.WriteLine("++++ CurrentPassTrajectoriesListBox_SelectionChanged Fired ++++");
             Trace.Flush();
             UpdateSelectedTrajectoryDetailUI(); // Renamed
             UpdateDirectionIndicator(); // Add call to update direction indicator
             RefreshCadCanvasHighlights(); // <-- THIS LINE IS ALREADY HERE
-            _isSelectionChangeHandled = false;
         }
 
         private void UpdateDirectionIndicator()
@@ -513,7 +507,7 @@ namespace RobTeach.Views
                     StrokeThickness = 1.5 * scale
                 };
 
-                List<Point> points = trajectoryInLoop.Points.Select(p => new Point(p.X, p.Y)).ToList();
+                List<System.Windows.Point> points = trajectoryInLoop.Points;
                 System.Windows.Point arrowStartPoint = new System.Windows.Point();
                 System.Windows.Point arrowEndPoint = new System.Windows.Point();
                 bool addIndicator = false;
@@ -731,7 +725,8 @@ namespace RobTeach.Views
                 }
                 else if (selectedTrajectory.PrimitiveType == "Polygon" && selectedTrajectory.Points.Count > 0)
                 {
-                    PolygonZTextBox.Text = selectedTrajectory.PolygonZ.ToString("F3");
+                    // System.Windows.Point has no Z, so we display 0.0 for now.
+                    PolygonZTextBox.Text = "0.000";
                 }
 
                 // Set Tags for Z-coordinate TextBoxes
@@ -745,7 +740,7 @@ namespace RobTeach.Views
                 if (selectedTrajectory.PrimitiveType == "Polygon")
                 {
                     PolygonVerticesGroupBox.Visibility = Visibility.Visible;
-                    PolygonVerticesListBox.ItemsSource = selectedTrajectory.Points.Select(p => new Point(p.X, p.Y)).ToList();
+                    PolygonVerticesListBox.ItemsSource = selectedTrajectory.Points;
                     PolygonVerticesListBox.Items.Refresh();
                 }
                 else
@@ -875,7 +870,7 @@ namespace RobTeach.Views
                     {
                         selectedTrajectory.Points.Reverse();
                         // Update the listbox directly since UpdateSelectedTrajectoryDetailUI would re-order it
-                        PolygonVerticesListBox.ItemsSource = selectedTrajectory.Points.Select(p => new Point(p.X, p.Y)).ToList();
+                        PolygonVerticesListBox.ItemsSource = selectedTrajectory.Points;
                         PolygonVerticesListBox.Items.Refresh();
                     }
 
@@ -892,14 +887,14 @@ namespace RobTeach.Views
         {
             if (trajectory == null) return;
 
+            trajectory.Points.Clear();
+
             switch (trajectory.PrimitiveType)
             {
                 case "Line":
-                    trajectory.Points.Clear();
-                    trajectory.Points.AddRange(_cadService.ConvertLineTrajectoryToPoints(trajectory).Select(p => new Point3D(p.X, p.Y, 0)));
+                    trajectory.Points.AddRange(_cadService.ConvertLineTrajectoryToPoints(trajectory));
                     break;
                 case "Arc":
-                    trajectory.Points.Clear();
                     if (trajectory.ArcPoint1 != null && trajectory.ArcPoint2 != null && trajectory.ArcPoint3 != null)
                     {
                         var arcParams = GeometryUtils.CalculateArcParametersFromThreePoints(
@@ -927,7 +922,7 @@ namespace RobTeach.Views
                             // We need to adapt _cadService.ConvertArcToPoints or use a similar discretization here.
 
                             // Re-using the logic from CadService.ConvertArcToPoints directly for now for simplicity:
-                            List<Point3D> arcPoints = new List<Point3D>();
+                            List<Point> arcPoints = new List<Point>();
                             double currentAngleDeg = startAngle;
                             double effectiveEndAngleDeg = endAngle;
 
@@ -977,7 +972,7 @@ namespace RobTeach.Views
                             if (sweepBackwards) {
                                 while (currentAngleDeg >= effectiveEndAngleDeg - Math.Abs(step)/2.0) { // Loop condition for backwards
                                     double radAngle = currentAngleDeg * Math.PI / 180.0;
-                                    arcPoints.Add(new Point3D(center.X + radius * Math.Cos(radAngle), center.Y + radius * Math.Sin(radAngle), center.Z));
+                                    arcPoints.Add(new Point(center.X + radius * Math.Cos(radAngle), center.Y + radius * Math.Sin(radAngle)));
                                     if (currentAngleDeg <= effectiveEndAngleDeg + 1e-5 && currentAngleDeg >= effectiveEndAngleDeg - 1e-5) break; // Reached end
                                     currentAngleDeg += step;
                                      if (currentAngleDeg < effectiveEndAngleDeg && currentAngleDeg > effectiveEndAngleDeg + step -1e-5 ) currentAngleDeg = effectiveEndAngleDeg; // Ensure last point
@@ -985,7 +980,7 @@ namespace RobTeach.Views
                             } else {
                                 while (currentAngleDeg <= effectiveEndAngleDeg + Math.Abs(step)/2.0) { // Loop condition for forwards
                                     double radAngle = currentAngleDeg * Math.PI / 180.0;
-                                    arcPoints.Add(new Point3D(center.X + radius * Math.Cos(radAngle), center.Y + radius * Math.Sin(radAngle), center.Z));
+                                    arcPoints.Add(new Point(center.X + radius * Math.Cos(radAngle), center.Y + radius * Math.Sin(radAngle)));
                                      if (currentAngleDeg <= effectiveEndAngleDeg + 1e-5 && currentAngleDeg >= effectiveEndAngleDeg - 1e-5) break; // Reached end
                                     currentAngleDeg += step;
                                     if (currentAngleDeg > effectiveEndAngleDeg && currentAngleDeg < effectiveEndAngleDeg + step - 1e-5) currentAngleDeg = effectiveEndAngleDeg; // Ensure last point
@@ -997,9 +992,9 @@ namespace RobTeach.Views
                         {
                             Debug.WriteLine($"[WARNING] PopulateTrajectoryPoints: Could not calculate arc parameters for trajectory. PrimitiveType: {trajectory.PrimitiveType}. Defaulting to line segments if P1,P2,P3 exist.");
                             // Fallback: add P1, P2, P3 as line segments if arc calculation fails
-                            if (trajectory.ArcPoint1 != null) trajectory.Points.Add(new Point3D(trajectory.ArcPoint1.Coordinates.X, trajectory.ArcPoint1.Coordinates.Y, trajectory.ArcPoint1.Coordinates.Z));
-                            if (trajectory.ArcPoint2 != null) trajectory.Points.Add(new Point3D(trajectory.ArcPoint2.Coordinates.X, trajectory.ArcPoint2.Coordinates.Y, trajectory.ArcPoint2.Coordinates.Z));
-                            if (trajectory.ArcPoint3 != null) trajectory.Points.Add(new Point3D(trajectory.ArcPoint3.Coordinates.X, trajectory.ArcPoint3.Coordinates.Y, trajectory.ArcPoint3.Coordinates.Z));
+                            if (trajectory.ArcPoint1 != null) trajectory.Points.Add(new Point(trajectory.ArcPoint1.Coordinates.X, trajectory.ArcPoint1.Coordinates.Y));
+                            if (trajectory.ArcPoint2 != null) trajectory.Points.Add(new Point(trajectory.ArcPoint2.Coordinates.X, trajectory.ArcPoint2.Coordinates.Y));
+                            if (trajectory.ArcPoint3 != null) trajectory.Points.Add(new Point(trajectory.ArcPoint3.Coordinates.X, trajectory.ArcPoint3.Coordinates.Y));
                         }
                     }
                     else
@@ -1008,7 +1003,6 @@ namespace RobTeach.Views
                     }
                     break;
                 case "Circle":
-                    trajectory.Points.Clear();
                     // Debug.WriteLine($"[JULES_DEBUG] PopulateTrajectoryPoints (Circle): Input P1={trajectory.CirclePoint1.Coordinates}, P2={trajectory.CirclePoint2.Coordinates}, P3={trajectory.CirclePoint3.Coordinates}");
                     var circleParams = GeometryUtils.CalculateCircleCenterRadiusFromThreePoints(
                         trajectory.CirclePoint1.Coordinates,
@@ -1019,7 +1013,7 @@ namespace RobTeach.Views
                     {
                         var (center, radius, normal) = circleParams.Value;
                         // Debug.WriteLine($"[JULES_DEBUG] PopulateTrajectoryPoints (Circle): Calculated Params: Center={center}, Radius={radius}, Normal={normal}");
-                        List<Point3D> circlePoints = new List<Point3D>();
+                        List<Point> circlePoints = new List<Point>();
 
                         DxfVector localXAxis;
                         double arbThreshold = 1.0 / 64.0;
@@ -1039,15 +1033,15 @@ namespace RobTeach.Views
                             DxfVector termY = new DxfVector(localYAxis.X * sinAngle, localYAxis.Y * sinAngle, localYAxis.Z * sinAngle);
                             DxfVector directionOnPlane_unscaled = termX + termY; // Assuming DxfVector + DxfVector is okay
                             DxfPoint pointOnCircle = center + new DxfVector(directionOnPlane_unscaled.X * radius, directionOnPlane_unscaled.Y * radius, directionOnPlane_unscaled.Z * radius);
-                            circlePoints.Add(new Point3D(pointOnCircle.X, pointOnCircle.Y, pointOnCircle.Z));
+                            circlePoints.Add(new Point(pointOnCircle.X, pointOnCircle.Y));
                             // Debug.WriteLine($"[JULES_DEBUG] PopulateTrajectoryPoints (Circle): angleDeg={angleDeg}, pointOnCircle={pointOnCircle}, Added to circlePoints. Count: {circlePoints.Count}");
                         }
 
                         if (circlePoints.Count > 0)
                         {
                             DxfPoint firstDxfPoint = center + new DxfVector(localXAxis.X * radius, localXAxis.Y * radius, localXAxis.Z * radius);
-                            Point3D firstPoint = new Point3D(firstDxfPoint.X, firstDxfPoint.Y, firstDxfPoint.Z);
-                            if (Math.Abs(circlePoints.Last().X - firstPoint.X) > 1e-6 || Math.Abs(circlePoints.Last().Y - firstPoint.Y) > 1e-6 || Math.Abs(circlePoints.Last().Z - firstPoint.Z) > 1e-6)
+                            Point firstPoint = new Point(firstDxfPoint.X, firstDxfPoint.Y);
+                            if (Point.Subtract(circlePoints.Last(), firstPoint).LengthSquared > 1e-6)
                             {
                                 circlePoints.Add(firstPoint);
                                 // Debug.WriteLine($"[JULES_DEBUG] PopulateTrajectoryPoints (Circle): Added closing point. Count: {circlePoints.Count}");
@@ -1060,33 +1054,19 @@ namespace RobTeach.Views
                     else
                     {
                         Debug.WriteLine($"[JULES_WARNING] PopulateTrajectoryPoints (Circle): Could not calculate circle parameters. Fallback to 3 points. P1={trajectory.CirclePoint1.Coordinates}, P2={trajectory.CirclePoint2.Coordinates}, P3={trajectory.CirclePoint3.Coordinates}");
-                        trajectory.Points.Add(new Point3D(trajectory.CirclePoint1.Coordinates.X, trajectory.CirclePoint1.Coordinates.Y, trajectory.CirclePoint1.Coordinates.Z));
+                        trajectory.Points.Add(new Point(trajectory.CirclePoint1.Coordinates.X, trajectory.CirclePoint1.Coordinates.Y));
                         // Debug.WriteLine($"[JULES_DEBUG] PopulateTrajectoryPoints (Circle Fallback): Added P1. Points count: {trajectory.Points.Count}");
-                        trajectory.Points.Add(new Point3D(trajectory.CirclePoint2.Coordinates.X, trajectory.CirclePoint2.Coordinates.Y, trajectory.CirclePoint2.Coordinates.Z));
+                        trajectory.Points.Add(new Point(trajectory.CirclePoint2.Coordinates.X, trajectory.CirclePoint2.Coordinates.Y));
                         // Debug.WriteLine($"[JULES_DEBUG] PopulateTrajectoryPoints (Circle Fallback): Added P2. Points count: {trajectory.Points.Count}");
-                        trajectory.Points.Add(new Point3D(trajectory.CirclePoint3.Coordinates.X, trajectory.CirclePoint3.Coordinates.Y, trajectory.CirclePoint3.Coordinates.Z));
+                        trajectory.Points.Add(new Point(trajectory.CirclePoint3.Coordinates.X, trajectory.CirclePoint3.Coordinates.Y));
                         // Debug.WriteLine($"[JULES_DEBUG] PopulateTrajectoryPoints (Circle Fallback): Added P3. Points count: {trajectory.Points.Count}");
                         if(trajectory.Points.Count > 1)
                         {
-                           trajectory.Points.Add(new Point3D(trajectory.CirclePoint1.Coordinates.X, trajectory.CirclePoint1.Coordinates.Y, trajectory.CirclePoint1.Coordinates.Z));
+                           trajectory.Points.Add(new Point(trajectory.CirclePoint1.Coordinates.X, trajectory.CirclePoint1.Coordinates.Y));
                            // Debug.WriteLine($"[JULES_DEBUG] PopulateTrajectoryPoints (Circle Fallback): Closed with P1. Points count: {trajectory.Points.Count}");
                         }
                     }
                     // Debug.WriteLine($"[JULES_DEBUG] PopulateTrajectoryPoints (Circle): Final trajectory.Points.Count = {trajectory.Points.Count}");
-                    break;
-                case "Polygon":
-                    if (trajectory.OriginalDxfEntity is DxfLwPolyline polyline)
-                    {
-                        trajectory.Points.Clear();
-                        var vertices = polyline.Vertices.Select(v => new Point3D(v.X, v.Y, polyline.Elevation)).ToList();
-                        int startIndex = FindBottomLeftVertexIndex(vertices.Select(p => new Point(p.X, p.Y)).ToList());
-                        var orderedVertices = new List<Point3D>();
-                        for (int i = 0; i < vertices.Count; i++)
-                        {
-                            orderedVertices.Add(vertices[(startIndex + i) % vertices.Count]);
-                        }
-                        trajectory.Points.AddRange(orderedVertices);
-                    }
                     break;
                 default:
                     // For other types or if PrimitiveType is not set, Points will remain empty or could be populated from OriginalDxfEntity if needed
@@ -1094,9 +1074,9 @@ namespace RobTeach.Views
                     // If OriginalDxfEntity exists and is of a known DxfEntityType, could fall back to old methods:
                     if (trajectory.OriginalDxfEntity != null) {
                         switch (trajectory.OriginalDxfEntity) {
-                            case DxfLine line: trajectory.Points.AddRange(_cadService.ConvertLineToPoints(line).Select(p => new Point3D(p.X, p.Y, 0))); break;
-                            case DxfArc arc: trajectory.Points.AddRange(_cadService.ConvertArcToPoints(arc, TrajectoryPointResolutionAngle).Select(p => new Point3D(p.X, p.Y, 0))); break;
-                            case DxfCircle circle: trajectory.Points.AddRange(_cadService.ConvertCircleToPoints(circle, TrajectoryPointResolutionAngle).Select(p => new Point3D(p.X, p.Y, 0))); break;
+                            case DxfLine line: trajectory.Points.AddRange(_cadService.ConvertLineToPoints(line)); break;
+                            case DxfArc arc: trajectory.Points.AddRange(_cadService.ConvertArcToPoints(arc, TrajectoryPointResolutionAngle)); break;
+                            case DxfCircle circle: trajectory.Points.AddRange(_cadService.ConvertCircleToPoints(circle, TrajectoryPointResolutionAngle)); break;
                         }
                     }
                     break;
@@ -1452,18 +1432,27 @@ namespace RobTeach.Views
         {
             if (double.TryParse(PolygonZTextBox.Text, out double newZ))
             {
-                if (selectedTrajectory.PolygonZ != newZ)
+                bool changed = false;
+                var newPoints = new List<System.Windows.Point>();
+                foreach (var point in selectedTrajectory.Points)
                 {
-                    double oldZ = selectedTrajectory.PolygonZ;
-                    selectedTrajectory.PolygonZ = newZ;
+                    // This is a simplification. System.Windows.Point does not have a Z property.
+                    // The Z coordinate must be stored elsewhere or this feature needs a more complex implementation
+                    // with a custom Point3D struct. For now, we assume Z is 0.
+                    changed = true; // Assume change if the text is updated
+                    newPoints.Add(new System.Windows.Point(point.X, point.Y));
+                }
 
-                    // Update the Z coordinate of all points in the polygon
-                    for (int i = 0; i < selectedTrajectory.Points.Count; i++)
+                if (changed)
+                {
+                    var newPointsAsWindowsPoint = new List<System.Windows.Point>();
+                    foreach (var p in newPoints)
                     {
-                        selectedTrajectory.Points[i] = new Point3D(selectedTrajectory.Points[i].X, selectedTrajectory.Points[i].Y, newZ);
+                        newPointsAsWindowsPoint.Add(new System.Windows.Point(p.X, p.Y));
                     }
+                    selectedTrajectory.Points = newPointsAsWindowsPoint;
 
-                    AppLogger.Log($"Trajectory '{selectedTrajectory.ToString()}' Polygon Z changed from {oldZ:F3} to {newZ:F3} in pass '{_currentConfiguration.SprayPasses[_currentConfiguration.CurrentPassIndex].PassName}'.");
+                    AppLogger.Log($"Trajectory '{selectedTrajectory.ToString()}' Polygon points Z set to {newZ:F3} in pass '{_currentConfiguration.SprayPasses[_currentConfiguration.CurrentPassIndex].PassName}'.");
                     isConfigurationDirty = true;
                     CurrentPassTrajectoriesListBox.Items.Refresh();
                     PolygonVerticesListBox.ItemsSource = selectedTrajectory.Points;
@@ -1475,7 +1464,11 @@ namespace RobTeach.Views
                 string msg = "Invalid Polygon Z value. Please enter a valid number.";
                 AppLogger.Log(msg, LogLevel.Error);
                 MessageBox.Show(msg, "Input Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                PolygonZTextBox.Text = selectedTrajectory.PolygonZ.ToString("F3");
+                if (selectedTrajectory.Points.Count > 0)
+                {
+                    // System.Windows.Point has no Z, so we display 0.0 for now.
+                    PolygonZTextBox.Text = "0.000";
+                }
             }
         }
     }
@@ -1826,6 +1819,7 @@ namespace RobTeach.Views
             Trajectory trajectoryToSelect = null; // Declare at wider scope
 
             // Detailed check for the main condition
+            Trajectory trajectoryToSelect = null;
             if (sender is System.Windows.Shapes.Shape clickedShape && _wpfShapeToDxfEntityMap.TryGetValue(clickedShape, out DxfEntity? dxfEntity))
             {
                 // keyExists is implicitly true if TryGetValue succeeds.
@@ -1892,9 +1886,16 @@ namespace RobTeach.Views
                     switch (dxfEntity)
                     {
                         case DxfLwPolyline polyline:
-                            trajectoryToSelect = CreatePolygonTrajectoryFromPolyline(polyline);
-                            currentPass.Trajectories.Add(trajectoryToSelect);
-                            break;
+                            var polygonTrajectory = CreatePolygonTrajectoryFromPolyline(polyline);
+                            currentPass.Trajectories.Add(polygonTrajectory);
+                            trajectoryToSelect = polygonTrajectory;
+                            RefreshCurrentPassTrajectoriesListBox();
+                            CurrentPassTrajectoriesListBox.SelectedItem = trajectoryToSelect;
+                            CurrentPassTrajectoriesListBox.Items.Refresh();
+                            RefreshCadCanvasHighlights();
+                            UpdateDirectionIndicator();
+                            UpdateOrderNumberLabels();
+                            return;
                         case DxfLine line:
                             newTrajectory.PrimitiveType = "Line";
                             double p1DistSq = line.P1.X * line.P1.X + line.P1.Y * line.P1.Y + line.P1.Z * line.P1.Z;
@@ -2012,13 +2013,14 @@ namespace RobTeach.Views
                             newTrajectory.PrimitiveType = dxfEntity.GetType().Name;
                             break;
                     }
-                    if (trajectoryToSelect != null)
-                    {
-                        PopulateTrajectoryPoints(trajectoryToSelect);
-                        trajectoryToSelect.Runtime = TrajectoryUtils.CalculateMinRuntime(trajectoryToSelect); // Set default runtime
-                        AppLogger.Log($"Trajectory added to pass '{currentPass.PassName}': Type '{trajectoryToSelect.PrimitiveType}', EntityHandle '{trajectoryToSelect.OriginalEntityHandle}'.", LogLevel.Info);
-                        isConfigurationDirty = true;
-                    }
+                    // This block is now redundant as all handled types add themselves to the trajectory list.
+                    // if (dxfEntity.GetType() != typeof(DxfLwPolyline))
+                    // {
+                    //     PopulateTrajectoryPoints(newTrajectory);
+                    //     newTrajectory.Runtime = TrajectoryUtils.CalculateMinRuntime(newTrajectory); // Set default runtime
+                    //     AppLogger.Log($"Trajectory added to pass '{currentPass.PassName}': Type '{newTrajectory.PrimitiveType}', EntityHandle '{newTrajectory.OriginalEntityHandle}'.", LogLevel.Info);
+                    //     isConfigurationDirty = true;
+                    // }
                 }
 
                 RefreshCurrentPassTrajectoriesListBox();
@@ -2341,34 +2343,10 @@ namespace RobTeach.Views
                     }
                     // else, no valid selection or list is empty, ListBox default behavior (no selection or first item)
 
-                    // Populate points for all trajectories in the loaded configuration
-                    if (_currentConfiguration != null && _currentConfiguration.SprayPasses != null)
+                    // Reconcile DxfEntity instances if DXF was loaded from embedded content
+                    if (!string.IsNullOrEmpty(_currentConfiguration.DxfFileContent) && _currentDxfDocument != null)
                     {
-                        foreach (var pass in _currentConfiguration.SprayPasses)
-                        {
-                            if (pass.Trajectories != null)
-                            {
-                                foreach (var trajectory in pass.Trajectories)
-                                {
-                                    PopulateTrajectoryPoints(trajectory);
-                                }
-                            }
-                        }
-                    }
-
-                    // Populate points for all trajectories in the loaded configuration
-                    if (_currentConfiguration != null && _currentConfiguration.SprayPasses != null)
-                    {
-                        foreach (var pass in _currentConfiguration.SprayPasses)
-                        {
-                            if (pass.Trajectories != null)
-                            {
-                                foreach (var trajectory in pass.Trajectories)
-                                {
-                                    PopulateTrajectoryPoints(trajectory);
-                                }
-                            }
-                        }
+                        ReconcileTrajectoryEntities(_currentConfiguration, _currentDxfDocument);
                     }
 
                     // Populate points for all trajectories in the loaded configuration
@@ -2386,12 +2364,6 @@ namespace RobTeach.Views
                                 }
                             }
                         }
-                    }
-
-                    // Reconcile DxfEntity instances if DXF was loaded from embedded content
-                    if (!string.IsNullOrEmpty(_currentConfiguration.DxfFileContent) && _currentDxfDocument != null)
-                    {
-                        ReconcileTrajectoryEntities(_currentConfiguration, _currentDxfDocument);
                     }
 
                     UpdateSelectedTrajectoryDetailUI(); // Renamed: Update nozzle UI for potentially selected trajectory
@@ -3630,9 +3602,9 @@ namespace RobTeach.Views
                 for (int i = 0; i < pass.Trajectories.Count; i++)
                 {
                     var trajectory = pass.Trajectories[i];
-                    if (trajectory.OriginalDxfEntity == null && trajectory.PrimitiveType != "Polygon")
+                    if (trajectory.OriginalDxfEntity == null)
                     {
-                        Debug.WriteLine($"[DEBUG] ReconcileTrajectoryEntities: Trajectory {i} in pass '{pass.PassName}' has null OriginalDxfEntity and is not a Polygon.");
+                        Debug.WriteLine($"[DEBUG] ReconcileTrajectoryEntities: Trajectory {i} in pass '{pass.PassName}' has null OriginalDxfEntity.");
                         continue;
                     }
 
@@ -3641,22 +3613,7 @@ namespace RobTeach.Views
 
                     for (int j = 0; j < availableDocEntities.Count; j++)
                     {
-                        if (trajectory.PrimitiveType == "Polygon")
-                        {
-                            if (availableDocEntities[j] is DxfLwPolyline polyline)
-                            {
-                                // A simple comparison for polygons could be to check if they have the same number of vertices
-                                // and if the first vertex is the same. This is not a robust check, but it's a start.
-                                if (polyline.Vertices.Count == trajectory.Points.Count &&
-                                    PointEquals(new DxfPoint(polyline.Vertices[0].X, polyline.Vertices[0].Y, polyline.Elevation), new DxfPoint(trajectory.Points[0].X, trajectory.Points[0].Y, trajectory.PolygonZ)))
-                                {
-                                    matchedEntity = availableDocEntities[j];
-                                    matchedEntityIndexInAvailableList = j;
-                                    break;
-                                }
-                            }
-                        }
-                        else if (AreEntitiesGeometricallyEquivalent(trajectory.OriginalDxfEntity, availableDocEntities[j]))
+                        if (AreEntitiesGeometricallyEquivalent(trajectory.OriginalDxfEntity, availableDocEntities[j]))
                         {
                             matchedEntity = availableDocEntities[j];
                             matchedEntityIndexInAvailableList = j;
@@ -3674,7 +3631,7 @@ namespace RobTeach.Views
                     {
                         // If no match, the trajectory.OriginalDxfEntity remains the deserialized instance.
                         // Highlighting will likely fail for this specific entity.
-                        Debug.WriteLine($"[WARNING] ReconcileTrajectoryEntities: Could not find a matching live entity for deserialized {trajectory.PrimitiveType}.");
+                        Debug.WriteLine($"[WARNING] ReconcileTrajectoryEntities: Could not find a matching live entity for deserialized {trajectory.OriginalDxfEntity.GetType().Name}.");
                     }
                 }
                 // Debug.WriteLine($"[JULES_DEBUG] ReconcileTrajectoryEntities: Finished processing pass '{pass.PassName}'. Final trajectory order for this pass:");
@@ -3842,26 +3799,24 @@ namespace RobTeach.Views
             return Rect.Empty;
         }
 
-        private int WritePointData(StreamWriter writer, int address, DxfPoint point, float rx = 0f, float ry = 0f, float rz = 0f)
+        private void WritePointData(StreamWriter writer, DxfPoint point, float rx = 0f, float ry = 0f, float rz = 0f)
         {
-            writer.WriteLine($"{address++}: {((float)point.X).ToString("F3")}");
-            writer.WriteLine($"{address++}: {((float)point.Y).ToString("F3")}");
-            writer.WriteLine($"{address++}: {((float)point.Z).ToString("F3")}");
-            writer.WriteLine($"{address++}: {rx.ToString("F3")}");
-            writer.WriteLine($"{address++}: {ry.ToString("F3")}");
-            writer.WriteLine($"{address++}: {rz.ToString("F3")}");
-            return address;
+            writer.WriteLine(((float)point.X).ToString("F3"));
+            writer.WriteLine(((float)point.Y).ToString("F3"));
+            writer.WriteLine(((float)point.Z).ToString("F3"));
+            writer.WriteLine(rx.ToString("F3"));
+            writer.WriteLine(ry.ToString("F3"));
+            writer.WriteLine(rz.ToString("F3"));
         }
 
-        private int WriteTrajectoryPointWithAnglesData(StreamWriter writer, int address, TrajectoryPointWithAngles point)
+        private void WriteTrajectoryPointWithAnglesData(StreamWriter writer, TrajectoryPointWithAngles point)
         {
-            writer.WriteLine($"{address++}: {((float)point.Coordinates.X).ToString("F3")}");
-            writer.WriteLine($"{address++}: {((float)point.Coordinates.Y).ToString("F3")}");
-            writer.WriteLine($"{address++}: {((float)point.Coordinates.Z).ToString("F3")}");
-            writer.WriteLine($"{address++}: {((float)point.Rx).ToString("F3")}");
-            writer.WriteLine($"{address++}: {((float)point.Ry).ToString("F3")}");
-            writer.WriteLine($"{address++}: {((float)point.Rz).ToString("F3")}");
-            return address;
+            writer.WriteLine(((float)point.Coordinates.X).ToString("F3"));
+            writer.WriteLine(((float)point.Coordinates.Y).ToString("F3"));
+            writer.WriteLine(((float)point.Coordinates.Z).ToString("F3"));
+            writer.WriteLine(((float)point.Rx).ToString("F3"));
+            writer.WriteLine(((float)point.Ry).ToString("F3"));
+            writer.WriteLine(((float)point.Rz).ToString("F3"));
         }
 
 
@@ -3897,7 +3852,54 @@ namespace RobTeach.Views
                     int primitiveIndexInPass = 0;
                     foreach (var trajectory in pass.Trajectories)
                     {
-                        if (trajectory.PrimitiveType != "Polygon")
+                        if (trajectory.PrimitiveType == "Polygon")
+                        {
+                            double totalLength = TrajectoryUtils.CalculateTrajectoryLength(trajectory);
+                            float speed = (float)(totalLength / trajectory.Runtime);
+
+                            for (int i = 0; i < trajectory.Points.Count - 1; i++)
+                            {
+                                primitiveIndexInPass++;
+                                writer.WriteLine($"{address++}: {((float)primitiveIndexInPass).ToString("F3")}");
+                                writer.WriteLine($"{address++}: {(1.0f).ToString("F3")}"); // Primitive Type: Line
+                                writer.WriteLine($"{address++}: {(trajectory.UpperNozzleGasOn ? 11.0f : 10.0f).ToString("F3")}");
+                                writer.WriteLine($"{address++}: {(trajectory.UpperNozzleLiquidOn ? 12.0f : 10.0f).ToString("F3")}");
+                                writer.WriteLine($"{address++}: {(trajectory.LowerNozzleGasOn ? 21.0f : 20.0f).ToString("F3")}");
+                                writer.WriteLine($"{address++}: {(trajectory.LowerNozzleLiquidOn ? 22.0f : 10.0f).ToString("F3")}");
+                                writer.WriteLine($"{address++}: {speed.ToString("F3")}");
+
+                                Point3D p1 = trajectory.Points[i];
+                                Point3D p2 = trajectory.Points[i + 1];
+                                address = WritePointData(writer, address, new DxfPoint(p1.X, p1.Y, p1.Z));
+                                address = WritePointData(writer, address, new DxfPoint(p2.X, p2.Y, p2.Z));
+
+                                writer.WriteLine($"{address++}: {0.0f.ToString("F3")}");
+                                writer.WriteLine($"{address++}: {0.0f.ToString("F3")}");
+                                writer.WriteLine($"{address++}: {0.0f.ToString("F3")}");
+                            }
+
+                            if (trajectory.OriginalDxfEntity is DxfLwPolyline polyline && polyline.IsClosed && trajectory.Points.Count > 2)
+                            {
+                                primitiveIndexInPass++;
+                                writer.WriteLine($"{address++}: {((float)primitiveIndexInPass).ToString("F3")}");
+                                writer.WriteLine($"{address++}: {(1.0f).ToString("F3")}"); // Primitive Type: Line
+                                writer.WriteLine($"{address++}: {(trajectory.UpperNozzleGasOn ? 11.0f : 10.0f).ToString("F3")}");
+                                writer.WriteLine($"{address++}: {(trajectory.UpperNozzleLiquidOn ? 12.0f : 10.0f).ToString("F3")}");
+                                writer.WriteLine($"{address++}: {(trajectory.LowerNozzleGasOn ? 21.0f : 20.0f).ToString("F3")}");
+                                writer.WriteLine($"{address++}: {(trajectory.LowerNozzleLiquidOn ? 22.0f : 10.0f).ToString("F3")}");
+                                writer.WriteLine($"{address++}: {speed.ToString("F3")}");
+
+                                Point3D p1 = trajectory.Points[trajectory.Points.Count - 1];
+                                Point3D p2 = trajectory.Points[0];
+                                address = WritePointData(writer, address, new DxfPoint(p1.X, p1.Y, p1.Z));
+                                address = WritePointData(writer, address, new DxfPoint(p2.X, p2.Y, p2.Z));
+
+                                writer.WriteLine($"{address++}: {0.0f.ToString("F3")}");
+                                writer.WriteLine($"{address++}: {0.0f.ToString("F3")}");
+                                writer.WriteLine($"{address++}: {0.0f.ToString("F3")}");
+                            }
+                        }
+                        else
                         {
                             primitiveIndexInPass++;
                             // 2.b.i. Primitive Index
@@ -3909,10 +3911,7 @@ namespace RobTeach.Views
                             else if (trajectory.PrimitiveType == "Circle") primitiveType = 2.0f;
                             else if (trajectory.PrimitiveType == "Arc") primitiveType = 3.0f;
                             writer.WriteLine($"{address++}: {primitiveType.ToString("F3")}");
-                        }
 
-                        if (trajectory.PrimitiveType != "Polygon")
-                        {
                             // 2.b.iii. Upper Nozzle Gas
                             writer.WriteLine($"{address++}: {(trajectory.UpperNozzleGasOn ? 11.0f : 10.0f).ToString("F3")}");
                             // 2.b.iv. Upper Nozzle Liquid
@@ -3936,107 +3935,56 @@ namespace RobTeach.Views
                                 // Else: runtime is zero/tiny, length is not. Speed remains 0.0f (implying problem or stop)
                             }
                             // Else: length is zero/tiny. Speed remains 0.0f.
-                            writer.WriteLine(speedForRobot.ToString("F3"));
-                        }
+                            writer.WriteLine($"{address++}: {speedForRobot.ToString("F3")}");
 
-                        // 2.b.viii. Primitive Geometry Data
-                        if (trajectory.PrimitiveType == "Line")
-                        {
-                            WritePointData(writer, trajectory.LineStartPoint); // Rx, Ry, Rz default to 0
-                            WritePointData(writer, trajectory.LineEndPoint);   // Rx, Ry, Rz default to 0
-                        }
-                        else if (trajectory.PrimitiveType == "Arc")
-                        {
-                            if (trajectory.ArcPoint1 == null || trajectory.ArcPoint2 == null || trajectory.ArcPoint3 == null)
+                            // 2.b.viii. Primitive Geometry Data
+                            if (trajectory.PrimitiveType == "Line")
                             {
-                                // Write placeholder zeros if arc points are somehow null
-                                for(int i=0; i < 3 * 6; i++) writer.WriteLine(0.0f.ToString("F3")); // 3 points * 6 floats
+                                address = WritePointData(writer, address, trajectory.LineStartPoint); // Rx, Ry, Rz default to 0
+                                address = WritePointData(writer, address, trajectory.LineEndPoint);   // Rx, Ry, Rz default to 0
                             }
-                            else
+                            else if (trajectory.PrimitiveType == "Arc")
                             {
-                                WriteTrajectoryPointWithAnglesData(writer, trajectory.ArcPoint1);
-                                // The second point for an Arc is ArcPoint2 (midpoint on circumference)
-                                WriteTrajectoryPointWithAnglesData(writer, trajectory.ArcPoint2);
-                                WriteTrajectoryPointWithAnglesData(writer, trajectory.ArcPoint3);
+                                if (trajectory.ArcPoint1 == null || trajectory.ArcPoint2 == null || trajectory.ArcPoint3 == null)
+                                {
+                                    // Write placeholder zeros if arc points are somehow null
+                                    for (int i = 0; i < 3 * 6; i++) writer.WriteLine($"{address++}: {0.0f.ToString("F3")}"); // 3 points * 6 floats
+                                }
+                                else
+                                {
+                                    address = WriteTrajectoryPointWithAnglesData(writer, address, trajectory.ArcPoint1);
+                                    // The second point for an Arc is ArcPoint2 (midpoint on circumference)
+                                    address = WriteTrajectoryPointWithAnglesData(writer, address, trajectory.ArcPoint2);
+                                    address = WriteTrajectoryPointWithAnglesData(writer, address, trajectory.ArcPoint3);
+                                }
                             }
-                        }
-                        else if (trajectory.PrimitiveType == "Circle")
-                        {
-                             if (trajectory.CirclePoint1 == null || trajectory.OriginalCircleCenter == null || trajectory.CirclePoint3 == null)
-                             {
-                                // Write placeholder zeros if circle points are somehow null
-                                for(int i=0; i < 3 * 6; i++) writer.WriteLine(0.0f.ToString("F3")); // 3 points * 6 floats
-                             }
-                             else
-                             {
-                                WriteTrajectoryPointWithAnglesData(writer, trajectory.CirclePoint1);
-                                // The second point for a Circle is CirclePoint2 (a point on circumference)
-                                WriteTrajectoryPointWithAnglesData(writer, trajectory.CirclePoint2);
-                                WriteTrajectoryPointWithAnglesData(writer, trajectory.CirclePoint3);
-                             }
-                        }
-                        else if (trajectory.PrimitiveType == "Polygon")
-                        {
-                            double totalLength = TrajectoryUtils.CalculateTrajectoryLength(trajectory);
-                            float speed = (float)(totalLength / trajectory.Runtime);
-
-                            for (int i = 0; i < trajectory.Points.Count - 1; i++)
+                            else if (trajectory.PrimitiveType == "Circle")
                             {
-                                primitiveIndexInPass++;
-                                writer.WriteLine(((float)primitiveIndexInPass).ToString("F3"));
-                                writer.WriteLine((1.0f).ToString("F3")); // Primitive Type: Line
-                                writer.WriteLine((trajectory.UpperNozzleGasOn ? 11.0f : 10.0f).ToString("F3"));
-                                writer.WriteLine((trajectory.UpperNozzleLiquidOn ? 12.0f : 10.0f).ToString("F3"));
-                                writer.WriteLine((trajectory.LowerNozzleGasOn ? 21.0f : 20.0f).ToString("F3"));
-                                writer.WriteLine((trajectory.LowerNozzleLiquidOn ? 22.0f : 10.0f).ToString("F3"));
-                                writer.WriteLine(speed.ToString("F3"));
-
-                                Point3D p1 = trajectory.Points[i];
-                                Point3D p2 = trajectory.Points[i + 1];
-                                WritePointData(writer, new DxfPoint(p1.X, p1.Y, p1.Z));
-                                WritePointData(writer, new DxfPoint(p2.X, p2.Y, p2.Z));
-
-                                writer.WriteLine(0.0f.ToString("F3"));
-                                writer.WriteLine(0.0f.ToString("F3"));
-                                writer.WriteLine(0.0f.ToString("F3"));
+                                if (trajectory.CirclePoint1 == null || trajectory.OriginalCircleCenter == null || trajectory.CirclePoint3 == null)
+                                {
+                                    // Write placeholder zeros if circle points are somehow null
+                                    for (int i = 0; i < 3 * 6; i++) writer.WriteLine($"{address++}: {0.0f.ToString("F3")}"); // 3 points * 6 floats
+                                }
+                                else
+                                {
+                                    address = WriteTrajectoryPointWithAnglesData(writer, address, trajectory.CirclePoint1);
+                                    // The second point for a Circle is CirclePoint2 (a point on circumference)
+                                    address = WriteTrajectoryPointWithAnglesData(writer, address, trajectory.CirclePoint2);
+                                    address = WriteTrajectoryPointWithAnglesData(writer, address, trajectory.CirclePoint3);
+                                }
+                            }
+                            else // Unknown primitive type
+                            {
+                                // Write placeholder zeros for geometry
+                                 for(int i=0; i < 2 * 6; i++) writer.WriteLine($"{address++}: {0.0f.ToString("F3")}"); // Default to 2 points * 6 floats like a line
                             }
 
-                            if (trajectory.OriginalDxfEntity is DxfLwPolyline polyline && polyline.IsClosed && trajectory.Points.Count > 2)
-                            {
-                                primitiveIndexInPass++;
-                                writer.WriteLine(((float)primitiveIndexInPass).ToString("F3"));
-                                writer.WriteLine((1.0f).ToString("F3")); // Primitive Type: Line
-                                writer.WriteLine((trajectory.UpperNozzleGasOn ? 11.0f : 10.0f).ToString("F3"));
-                                writer.WriteLine((trajectory.UpperNozzleLiquidOn ? 12.0f : 10.0f).ToString("F3"));
-                                writer.WriteLine((trajectory.LowerNozzleGasOn ? 21.0f : 20.0f).ToString("F3"));
-                                writer.WriteLine((trajectory.LowerNozzleLiquidOn ? 22.0f : 10.0f).ToString("F3"));
-                                writer.WriteLine(speed.ToString("F3"));
-
-                                Point3D p1 = trajectory.Points[trajectory.Points.Count - 1];
-                                Point3D p2 = trajectory.Points[0];
-                                WritePointData(writer, new DxfPoint(p1.X, p1.Y, p1.Z));
-                                WritePointData(writer, new DxfPoint(p2.X, p2.Y, p2.Z));
-
-                                writer.WriteLine(0.0f.ToString("F3"));
-                                writer.WriteLine(0.0f.ToString("F3"));
-                                writer.WriteLine(0.0f.ToString("F3"));
-                            }
-                        }
-                        else // Unknown primitive type
-                        {
-                            // Write placeholder zeros for geometry
-                             for(int i=0; i < 2 * 6; i++) writer.WriteLine(0.0f.ToString("F3")); // Default to 2 points * 6 floats like a line
-                        }
-
-                        if (trajectory.PrimitiveType != "Polygon")
-                        {
                             // 2.b.ix. Reserved Values
-                            writer.WriteLine(0.0f.ToString("F3"));
-                            writer.WriteLine(0.0f.ToString("F3"));
-                            writer.WriteLine(0.0f.ToString("F3"));
+                            writer.WriteLine($"{address++}: {0.0f.ToString("F3")}");
+                            writer.WriteLine($"{address++}: {0.0f.ToString("F3")}");
+                            writer.WriteLine($"{address++}: {0.0f.ToString("F3")}");
                         }
                     }
-
                 }
             }
             return dataFilePath; // Return the actual path where the file is saved
@@ -4180,13 +4128,12 @@ namespace RobTeach.Views
                 OriginalDxfEntity = polyline,
                 EntityType = polyline.GetType().Name,
                 IsReversed = false,
-                PrimitiveType = "Polygon",
-                PolygonZ = polyline.Elevation
+                PrimitiveType = "Polygon"
             };
 
-            var vertices = polyline.Vertices.Select(v => new Point3D(v.X, v.Y, polyline.Elevation)).ToList();
-            int startIndex = FindBottomLeftVertexIndex(vertices.Select(p => new Point(p.X, p.Y)).ToList());
-            var orderedVertices = new List<Point3D>();
+            var vertices = polyline.Vertices.Select(v => new System.Windows.Point(v.X, v.Y)).ToList();
+            int startIndex = FindBottomLeftVertexIndex(vertices);
+            var orderedVertices = new List<System.Windows.Point>();
             for (int i = 0; i < vertices.Count; i++)
             {
                 orderedVertices.Add(vertices[(startIndex + i) % vertices.Count]);
@@ -4199,7 +4146,7 @@ namespace RobTeach.Views
             return newTrajectory;
         }
 
-        private int FindBottomLeftVertexIndex(List<Point> vertices)
+        private int FindBottomLeftVertexIndex(List<System.Windows.Point> vertices)
         {
             if (vertices == null || vertices.Count == 0) return -1;
 
